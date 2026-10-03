@@ -146,7 +146,7 @@ func DefaultHiddifyOptions() *HiddifyOptions {
 		EnableClashApi: true,
 
 		ClashApiPort:   16756,
-		ClashApiSecret: "",
+		ClashApiSecret: RandomClashApiSecret(),
 		// GeoIPPath:      "geoip.db",
 		// GeoSitePath:    "geosite.db",
 		Rules: []Rule{},
