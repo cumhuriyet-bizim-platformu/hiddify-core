@@ -9,25 +9,34 @@
 #                      <root>/.github/forbidden-endpoints.allow)
 # Exit codes: 0 clean, 1 violations found, 2 usage or allowlist error.
 set -euo pipefail
+# Pin the locale: byte-wise matching (no encoding errors that drop matches) and fixed
+# character classes in grep and awk.
+export LC_ALL=C
+
+usage_error() { echo "$1" >&2; echo "usage: check-forbidden-endpoints.sh [--root DIR] [--allowlist FILE]" >&2; exit 2; }
 
 root="."
 allowlist=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --root) root="$2"; shift 2 ;;
-    --allowlist) allowlist="$2"; shift 2 ;;
+    --root) [ $# -ge 2 ] || usage_error "--root needs a directory"; root="$2"; shift 2 ;;
+    --allowlist) [ $# -ge 2 ] || usage_error "--allowlist needs a file"; allowlist="$2"; shift 2 ;;
     -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
-    *) echo "unknown argument: $1" >&2; exit 2 ;;
+    *) usage_error "unknown argument: $1" ;;
   esac
 done
 
-cd "$root"
+cd "$root" 2>/dev/null || usage_error "cannot enter --root $root"
 if [ -z "$allowlist" ]; then
   if [ -f scripts/forbidden-endpoints.allow ]; then
     allowlist="scripts/forbidden-endpoints.allow"
   elif [ -f .github/forbidden-endpoints.allow ]; then
     allowlist=".github/forbidden-endpoints.allow"
   fi
+fi
+if [ -n "$allowlist" ] && { [ ! -r "$allowlist" ] || [ -d "$allowlist" ]; }; then
+  echo "allowlist error: $allowlist is missing or not readable" >&2
+  exit 2
 fi
 
 # Files that are never scanned: credits and license files, upstream notes,
@@ -45,11 +54,17 @@ RULE_HIDDIFY_COM="${B0}hiddify\.com${E0}"
 # Rule hiddify-github: fetches from Hiddify's GitHub organisations.
 RULE_HIDDIFY_GITHUB="((https?|ssh|git)://([^/@[:space:]]+@)?|git@)(www\.)?github\.com[:/](hiddify|hiddify-com|hiddifydeveloper)([/.[:space:]\"']|$)|raw\.githubusercontent\.com/(hiddify|hiddify-com|hiddifydeveloper)/|api\.github\.com/repos/(hiddify|hiddify-com|hiddifydeveloper)/|codeload\.github\.com/(hiddify|hiddify-com|hiddifydeveloper)/|=>[[:space:]]*github\.com/(hiddify|hiddify-com|hiddifydeveloper)/|uses:[[:space:]]*(hiddify|hiddify-com|hiddifydeveloper)/|hiddifydeveloper"
 
+all_files="$(mktemp)"
 files_list="$(mktemp)"
 hits="$(mktemp)"
-trap 'rm -f "$files_list" "$hits"' EXIT
+trap 'rm -f "$all_files" "$files_list" "$hits"' EXIT
 
-git ls-files | grep -vE "$EXCLUDE_RE" > "$files_list" || true
+# A failed listing (not a git work tree, safe.directory refusal) must never look clean.
+if ! git -c core.quotePath=false ls-files > "$all_files"; then
+  echo "error: git ls-files failed in $(pwd); --root must be a git work tree" >&2
+  exit 2
+fi
+grep -vE "$EXCLUDE_RE" "$all_files" > "$files_list" || true
 
 scan() {
   local name="$1" pattern="$2"
