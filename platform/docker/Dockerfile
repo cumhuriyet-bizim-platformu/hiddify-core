@@ -1,6 +1,6 @@
 FROM alpine:latest
 ENV CONFIG='https://raw.githubusercontent.com/ircfspace/warpsub/main/export/warp#WARP%20(IRCF)'
-ENV VERSION=v4.1.0
+ENV VERSION=core-v4.1.0-derbent.1
 WORKDIR /hiddify
 RUN apk add  curl tar gzip libc6-compat # iptables ip6tables
 
@@ -15,8 +15,8 @@ RUN echo "architecture: $(apk --print-arch)" && \
             s390x) ARCH=s390x ;; \
             *) echo "Unsupported architecture: $(apk --print-arch) $(uname -m)" && exit 1 ;; \
         esac && \
-        echo "Downloading https://github.com/hiddify/hiddify-core/releases/download/${VERSION}/hiddify-core-linux-$ARCH.tar.gz" && \
-        curl -L -o hiddify-core.tar.gz https://github.com/hiddify/hiddify-core/releases/download/${VERSION}/hiddify-core-linux-$ARCH.tar.gz && \
+        echo "Downloading https://github.com/cumhuriyet-bizim-platformu/derbent-releases/releases/download/${VERSION}/hiddify-core-linux-$ARCH.tar.gz" && \
+        curl -fL -o hiddify-core.tar.gz https://github.com/cumhuriyet-bizim-platformu/derbent-releases/releases/download/${VERSION}/hiddify-core-linux-$ARCH.tar.gz && \
         tar -xzf hiddify-core.tar.gz && rm hiddify-core.tar.gz
 COPY hiddify.sh .
 RUN chmod +x hiddify.sh

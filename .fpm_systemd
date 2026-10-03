@@ -5,7 +5,7 @@
 --description "The universal proxy platform."
 --url "https://hiddify.com/"
 --maintainer "hiddify <core@hiddify.com>"
---deb-field "Bug: https://github.com/hiddify/hiddify-core/issues"
+--deb-field "Bug: https://github.com/cumhuriyet-bizim-platformu/hiddify-core/issues"
 --no-deb-generate-changes
 --config-files /etc/hiddify-core/config.json
 --after-install release/config/hiddify-core.postinst

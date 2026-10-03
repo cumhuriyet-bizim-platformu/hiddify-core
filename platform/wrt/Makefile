@@ -5,10 +5,10 @@ PKG_VERSION:=draft..
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://codeload.github.com/hiddify/hiddify-core/tar.gz/v$(PKG_VERSION)?
+PKG_SOURCE_URL:=https://codeload.github.com/cumhuriyet-bizim-platformu/hiddify-core/tar.gz/v$(PKG_VERSION)?
 PKG_HASH:=bffb9fb11f537eda6287d4c70502042272327c9323d0e46ffd94ddac39fd5ccb
 
-PKG_LICENSE:=https://github.com/hiddify/hiddify-app/edit/main/LICENSE.md
+PKG_LICENSE:=https://github.com/cumhuriyet-bizim-platformu/hiddify-app/blob/derbent/LICENSE.md
 PKG_LICENSE_FILES:=LICENSE
 PKG_MAINTAINER:=Hiddify <wrt@hiddify.com>
 
