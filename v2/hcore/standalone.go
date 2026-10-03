@@ -178,7 +178,7 @@ func buildStandaloneConfig(ctx context.Context, ropt *config.ReadOptions, hopts 
 		finalconfig.Experimental.ClashAPI.ExternalController = "127.0.0.1:16756"
 	}
 
-	fmt.Printf("Open http://localhost:6756/ui/?secret=%s in your browser\n", finalconfig.Experimental.ClashAPI.Secret)
+	fmt.Println("Open http://localhost:6756/ui/ in your browser (the API secret is in your config)")
 
 	if err := Setup(
 		&SetupRequest{
