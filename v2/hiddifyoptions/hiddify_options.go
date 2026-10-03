@@ -1,11 +1,21 @@
 package hiddifyoptions
 
 import (
+	crand "crypto/rand"
+	"encoding/hex"
 	"fmt"
 	reflect "reflect"
 	"strconv"
 	"strings"
 )
+
+func randomWebSecret() string {
+	b := make([]byte, 32)
+	if _, err := crand.Read(b); err != nil {
+		panic("crypto/rand unavailable: " + err.Error())
+	}
+	return hex.EncodeToString(b)
+}
 
 func DefaultHiddifyOptions() *HiddifyOptions {
 	return &HiddifyOptions{
@@ -46,7 +56,7 @@ func DefaultHiddifyOptions() *HiddifyOptions {
 		Region:         "other",
 		EnableClashApi: true,
 		ClashApiPort:   16756,
-		WebSecret:      "",
+		WebSecret:      randomWebSecret(),
 		// GeoIPPath:      "geoip.db",
 		// GeoSitePath:    "geosite.db",
 

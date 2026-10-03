@@ -165,7 +165,11 @@ func buildStandaloneConfig(ctx context.Context, ropt *config.ReadOptions, hopts 
 	finalconfig.Experimental = &option.ExperimentalOptions{
 		ClashAPI: &option.ClashAPIOptions{
 			ExternalUI: "webui",
+			Secret:     hopts.ClashApiSecret,
 		},
+	}
+	if finalconfig.Experimental.ClashAPI.Secret == "" {
+		finalconfig.Experimental.ClashAPI.Secret = config.RandomClashApiSecret()
 	}
 	// finalconfig.Experimental.ClashAPI.ExternalUI = "webui"
 	if hopts.AllowConnectionFromLAN {

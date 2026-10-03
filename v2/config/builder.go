@@ -397,7 +397,7 @@ func setExperimental(options *option.Options, hopt *HiddifyOptions) {
 	}
 	if hopt.EnableClashApi {
 		if hopt.ClashApiSecret == "" {
-			hopt.ClashApiSecret = generateRandomString(16)
+			hopt.ClashApiSecret = RandomClashApiSecret()
 		}
 		options.Experimental = &option.ExperimentalOptions{
 			UnifiedDelay: &option.UnifiedDelayOptions{
