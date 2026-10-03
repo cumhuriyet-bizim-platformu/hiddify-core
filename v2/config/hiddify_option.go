@@ -18,6 +18,7 @@ type HiddifyOptions struct {
 	ClashApiPort            uint16 `json:"clash-api-port,omitempty"`
 	ClashApiSecret          string `json:"web-secret,omitempty"`
 	Region                  string `json:"region,omitempty"`
+	RuleSetDir              string `json:"rule-set-dir,omitempty"` // bundled .srs files, set by the app; not overridable
 	BlockAds                bool   `json:"block-ads,omitempty" overridable:"true"`
 	UseXrayCoreWhenPossible bool   `json:"use-xray-core-when-possible,omitempty" overridable:"true"`
 	BalancerStrategy        string `json:"balancer-strategy,omitempty" overridable:"true"`
