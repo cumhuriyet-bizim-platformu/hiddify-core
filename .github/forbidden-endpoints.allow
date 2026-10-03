@@ -1,0 +1,9 @@
+# Forbidden-endpoint allowlist for the core fork (cumhuriyet-bizim-platformu/hiddify-core, branch derbent).
+# Format: <path ERE> TAB <line ERE> TAB <justification>. Every entry needs a justification.
+^go\.mod$	=>[[:space:]]*github\.com/(hiddify|hiddifydeveloper)/	go.mod keeps its upstream form (spec section 6); derbent builds resolve these modules to monorepo folders through go.work (Task 22), verified in CI with GOVCS off for Hiddify paths
+^\.gitmodules$	url = (https://github\.com/hiddify/hiddify-sing-box|git@github\.com:hiddify/ray2sing\.git)$	nested submodules are never initialised by derbent builds; the monorepo copies in core/hiddify-sing-box and core/ray2sing are used instead (Task 22)
+^v2/config/dns\.go$	^[[:space:]]*//	commented-out code, never compiled
+^v2/config/builder\.go$	^[[:space:]]*//.*app\.hiddify\.com	commented-out code; app.hiddify.com is the Android application id, renamed with branding (group D, out of scope)
+^\.fpm_(systemd|openwrt)$	^--(url|maintainer) 	package metadata (homepage, maintainer); not contacted; changes with branding (group D, out of scope)
+^platform/wrt/Makefile$	^[[:space:]]*(PKG_MAINTAINER|URL):=	OpenWrt package metadata; not contacted; changes with branding (group D, out of scope)
+^release/config/hiddify-core@?\.service$	^Documentation=	systemd unit documentation link; not contacted; changes with branding (group D, out of scope)

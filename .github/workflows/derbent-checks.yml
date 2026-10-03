@@ -1,0 +1,25 @@
+name: derbent-checks
+
+# Derbent-only checks for the derbent branch. Every action is pinned to a full commit SHA
+# (the version is in the trailing comment).
+on:
+  push:
+    branches: [derbent]
+  pull_request:
+    branches: [derbent]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forbidden-endpoints:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          submodules: false
+          persist-credentials: false
+      - name: Forbidden-endpoint check (spec section 7)
+        run: bash .github/scripts/check-forbidden-endpoints.sh
