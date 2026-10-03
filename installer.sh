@@ -67,25 +67,26 @@ ARTIFACT="hiddify-core-linux-${ARCH}${LIBC}.tar.gz"
 
 # Fetch latest version
 echo -e "Fetching latest version information..."
-REPO="hiddify/hiddify-core"
-LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+REPO="cumhuriyet-bizim-platformu/derbent-releases"
+# derbent-releases also holds app and server releases: take the newest core-v* tag.
+LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases?per_page=100" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | grep '^core-v' | head -n 1)
 
 if [ -z "$LATEST_TAG" ]; then
     echo -e "${RED}Failed to fetch latest version tag. Attempting fallback...${NC}"
-    LATEST_TAG="v4.0.4" # Fallback
+    LATEST_TAG="core-v4.1.0-derbent.1" # Fallback
 fi
 
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/$ARTIFACT"
 
 echo -e "Downloading ${BLUE}$ARTIFACT${NC} ($LATEST_TAG)..."
 WORKDIR=$(mktemp -d)
-curl -L "$DOWNLOAD_URL" -o "$WORKDIR/$ARTIFACT" || {
+curl -fL "$DOWNLOAD_URL" -o "$WORKDIR/$ARTIFACT" || {
     # If specific libc variant fails, try generic
     if [ -n "$LIBC" ]; then
         echo -e "Libc-specific artifact not found, trying generic..."
         ARTIFACT="hiddify-core-linux-${ARCH}.tar.gz"
         DOWNLOAD_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/$ARTIFACT"
-        curl -L "$DOWNLOAD_URL" -o "$WORKDIR/$ARTIFACT"
+        curl -fL "$DOWNLOAD_URL" -o "$WORKDIR/$ARTIFACT"
     fi
 }
 

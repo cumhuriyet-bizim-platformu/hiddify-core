@@ -57,13 +57,6 @@ ios: lib_install
 	cp Info.plist $(BINDIR)/HiddifyCore.xcframework/
 
 
-webui:
-	curl -L -o webui.zip  https://github.com/hiddify/Yacd-meta/archive/gh-pages.zip 
-	unzip -d ./ -q webui.zip
-	rm webui.zip
-	rm -rf bin/webui
-	mv Yacd-meta-gh-pages bin/webui
-
 .PHONY: build
 windows-amd64: prepare
 	rm -rf $(BINDIR)/*
@@ -82,7 +75,6 @@ windows-amd64: prepare
 		exit 1; \
 	fi
 
-# 	make webui
 	
 
 
@@ -149,7 +141,6 @@ build-linux: prepare
 		ls -R $(BINDIR); \
 		exit 1; \
 	fi
-# 	make webui
 
 
 linux-custom: prepare  install_cronet
@@ -158,7 +149,6 @@ linux-custom: prepare  install_cronet
 	$(load_cronet_env)
 	go build -ldflags="$(LDFLAGS)" -trimpath -tags $(TAGS) -o $(BINDIR)/$(CLINAME) ./cmd/main
 	chmod +x $(BINDIR)/$(CLINAME)
-	make webui
 
 macos-amd64:
 	env GOOS=darwin GOARCH=amd64 CGO_CFLAGS="-mmacosx-version-min=10.11 -O2" CGO_LDFLAGS="-mmacosx-version-min=10.11 -O2 -lpthread" CGO_ENABLED=1 go build -trimpath -tags $(TAGS),$(MACOS_ADD_TAGS) -buildmode=c-shared -o $(BINDIR)/$(LIBNAME)-amd64.dylib ./platform/desktop
