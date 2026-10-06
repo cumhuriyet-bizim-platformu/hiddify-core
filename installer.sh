@@ -12,8 +12,11 @@ NC='\033[0m'
 
 echo -e "${BLUE}Hiddify Core Universal Installer${NC}"
 
+# DESTDIR stages the files under another root (packaging, tests): no root, no services.
+DESTDIR="${DESTDIR:-}"
+
 # Check for root
-if [ "$EUID" -ne 0 ]; then
+if [ -z "$DESTDIR" ] && [ "$EUID" -ne 0 ]; then
     echo -e "${RED}Please run as root${NC}"
     exit 1
 fi
@@ -80,6 +83,7 @@ DOWNLOAD_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/$ARTIFACT"
 
 echo -e "Downloading ${BLUE}$ARTIFACT${NC} ($LATEST_TAG)..."
 WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' EXIT
 curl -fL "$DOWNLOAD_URL" -o "$WORKDIR/$ARTIFACT" || {
     # If specific libc variant fails, try generic
     if [ -n "$LIBC" ]; then
@@ -90,19 +94,50 @@ curl -fL "$DOWNLOAD_URL" -o "$WORKDIR/$ARTIFACT" || {
     fi
 }
 
+# Verify the archive against the same release's SHA256SUMS before extracting it.
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+echo -e "Verifying ${BLUE}$ARTIFACT${NC} against SHA256SUMS..."
+curl -fL "https://github.com/$REPO/releases/download/$LATEST_TAG/SHA256SUMS" -o "$WORKDIR/SHA256SUMS" || {
+    echo -e "${RED}Could not download SHA256SUMS for $LATEST_TAG; refusing to install.${NC}"
+    exit 1
+}
+# Exact match on the second field (the file name, with an optional binary-mode "*").
+EXPECTED=$(awk -v f="$ARTIFACT" '$2 == f || $2 == "*" f { print tolower($1); exit }' "$WORKDIR/SHA256SUMS")
+if ! printf '%s' "$EXPECTED" | grep -Eq '^[0-9a-f]{64}$'; then
+    echo -e "${RED}SHA256SUMS has no valid entry for $ARTIFACT; refusing to install.${NC}"
+    exit 1
+fi
+ACTUAL=$(sha256_of "$WORKDIR/$ARTIFACT")
+if [ "$ACTUAL" != "$EXPECTED" ]; then
+    echo -e "${RED}Checksum mismatch for $ARTIFACT (expected $EXPECTED, got $ACTUAL); refusing to install.${NC}"
+    exit 1
+fi
+echo -e "Checksum ${GREEN}OK${NC}."
+
 # Install Binary
-echo -e "Installing binary to /usr/bin/hiddify-core..."
+echo -e "Installing binary to $DESTDIR/usr/bin/hiddify-core..."
 tar -zxf "$WORKDIR/$ARTIFACT" -C "$WORKDIR"
 # Find the binary in the tarball (it might be in a subdir or renamed)
-BIN_PATH=$(find "$WORKDIR" -type f -name "hiddify*" -executable | head -n 1)
-mv "$BIN_PATH" /usr/bin/hiddify-core
-chmod +x /usr/bin/hiddify-core
+BIN_PATH=$(find "$WORKDIR" -type f -name "hiddify*" -perm -u+x | head -n 1)
+if [ -z "$BIN_PATH" ]; then
+    echo -e "${RED}No hiddify binary found in $ARTIFACT.${NC}"
+    exit 1
+fi
+mkdir -p "$DESTDIR/usr/bin"
+mv "$BIN_PATH" "$DESTDIR/usr/bin/hiddify-core"
+chmod +x "$DESTDIR/usr/bin/hiddify-core"
 
 # Setup Config
-mkdir -p /etc/hiddify-core
-if [ ! -f /etc/hiddify-core/config.json ]; then
+mkdir -p "$DESTDIR/etc/hiddify-core"
+if [ ! -f "$DESTDIR/etc/hiddify-core/config.json" ]; then
     echo -e "Creating default configuration..."
-    cat <<EOF > /etc/hiddify-core/config.json
+    cat <<EOF > "$DESTDIR/etc/hiddify-core/config.json"
 {
   "log": { "level": "info" },
   "dns": { "servers": [{ "address": "tls://8.8.8.8" }] },
@@ -114,7 +149,9 @@ EOF
 fi
 
 # Service Configuration
-if [ "$OS" = "openwrt" ]; then
+if [ -n "$DESTDIR" ]; then
+    echo -e "Staged install under $DESTDIR: skipping service setup."
+elif [ "$OS" = "openwrt" ]; then
     echo -e "Configuring ${GREEN}OpenWrt procd${NC} service..."
     
     # UCI Config
@@ -190,4 +227,3 @@ else
     echo -e "Service: systemctl status hiddify-core"
 fi
 
-rm -rf "$WORKDIR"
