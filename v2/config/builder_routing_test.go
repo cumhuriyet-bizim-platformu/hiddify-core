@@ -10,6 +10,8 @@ import (
 	"github.com/sagernet/sing-box/option"
 )
 
+const validRoutingJSON = `{"version":3,"rules":[{"domain_suffix":["example.com"],"ip_cidr":["10.9.0.0/16"]}]}`
+
 // routingOptsIn builds options over a shared rule-set dir so marshalled output is comparable.
 func routingOptsIn(t *testing.T, dir, mode string, withFile bool) *HiddifyOptions {
 	t.Helper()
@@ -17,7 +19,7 @@ func routingOptsIn(t *testing.T, dir, mode string, withFile bool) *HiddifyOption
 	hopt.DerbentRoutingMode = mode
 	if withFile {
 		p := filepath.Join(t.TempDir(), "routing.json")
-		if err := os.WriteFile(p, []byte(`{"version":2,"rules":[{"domain_suffix":["example.com"]}]}`), 0o644); err != nil {
+		if err := os.WriteFile(p, []byte(``+validRoutingJSON+``), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		hopt.DerbentRoutingRuleSet = p
@@ -189,5 +191,92 @@ func TestRoutingFieldsNotOverridable(t *testing.T) {
 	}
 	if hopt.DerbentRoutingMode != "" || hopt.DerbentRoutingRuleSet != "" {
 		t.Fatalf("overridden: %q %q", hopt.DerbentRoutingMode, hopt.DerbentRoutingRuleSet)
+	}
+}
+
+func TestRoutingBadFileIsFullVPN(t *testing.T) {
+	dir := writeRuleSetDir(t, bundledRuleSetFiles)
+	base, _ := json.Marshal(buildRouting(t, routingOptsIn(t, dir, "", false)))
+	bad := map[string]string{
+		"truncated json":  `{"version":3,"rules":[{"domain_suffix":["a.co`,
+		"missing version": `{"rules":[{"domain_suffix":["example.com"]}]}`,
+		"version 99":      `{"version":99,"rules":[{"domain_suffix":["example.com"]}]}`,
+		"version 2":       `{"version":2,"rules":[{"domain_suffix":["example.com"]}]}`,
+		"no rules":        `{"version":3,"rules":[]}`,
+		"domain_regex":    `{"version":3,"rules":[{"domain_regex":["^a"]}]}`,
+		"process_name":    `{"version":3,"rules":[{"process_name":["x"]}]}`,
+		"mixed bad key":   `{"version":3,"rules":[{"domain":["a.com"]},{"process_name":["x"]}]}`,
+		"bad cidr":        `{"version":3,"rules":[{"ip_cidr":["not-a-cidr"]}]}`,
+	}
+	for name, content := range bad {
+		for _, mode := range []string{"whitelist", "full"} {
+			hopt := routingOptsIn(t, dir, mode, false)
+			p := filepath.Join(t.TempDir(), "routing.json")
+			if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			hopt.DerbentRoutingRuleSet = p
+			got, _ := json.Marshal(buildRouting(t, hopt))
+			if string(got) != string(base) {
+				t.Errorf("%s/%s: config differs from today's", name, mode)
+			}
+		}
+	}
+}
+
+func dnsRuleServers(o *option.Options) (listed, tr, fake, catchAll string) {
+	for _, r := range o.DNS.Rules {
+		d := r.DefaultOptions
+		for _, s := range d.RuleSet {
+			if s == "derbent-routing" {
+				listed = d.RouteOptions.Server
+			}
+		}
+		for _, s := range d.DomainSuffix {
+			if s == ".tr" {
+				tr = d.RouteOptions.Server
+			}
+		}
+		if len(d.QueryType) > 0 && d.RouteOptions.Server == DNSFakeTag {
+			fake = DNSFakeTag
+		}
+		if len(d.RuleSet) == 0 && len(d.DomainSuffix) == 0 && len(d.QueryType) == 0 && d.Action == C.RuleActionTypeRoute {
+			catchAll = d.RouteOptions.Server
+		}
+	}
+	return
+}
+
+func TestRoutingWhitelistDNS(t *testing.T) {
+	hopt := routingOpts(t, "whitelist", true)
+	hopt.EnableFakeDNS = true
+	o := buildRouting(t, hopt)
+	listed, _, fake, catchAll := dnsRuleServers(o)
+	if listed != DNSRemoteTag {
+		t.Errorf("listed names use %q, want remote", listed)
+	}
+	if catchAll != DNSMultiDirectTag {
+		t.Errorf("unlisted names use %q, want direct", catchAll)
+	}
+	if fake != "" {
+		t.Error("fake DNS rule present in whitelist mode, it would catch unlisted names")
+	}
+	for _, r := range o.DNS.Rules {
+		if r.DefaultOptions.RouteOptions.Strategy != hopt.RemoteDnsDomainStrategy && r.DefaultOptions.RuleSet != nil {
+			for _, s := range r.DefaultOptions.RuleSet {
+				if s == "derbent-routing" {
+					t.Errorf("remote shape strategy %v", r.DefaultOptions.RouteOptions.Strategy)
+				}
+			}
+		}
+	}
+}
+
+func TestRoutingFullModeDNSUnchanged(t *testing.T) {
+	hopt := routingOpts(t, "full", true)
+	hopt.EnableFakeDNS = true
+	_, _, fake, catchAll := dnsRuleServers(buildRouting(t, hopt))
+	if catchAll != DNSMultiRemoteTag || fake == "" {
+		t.Errorf("full mode: catchAll=%q fake=%q", catchAll, fake)
 	}
 }

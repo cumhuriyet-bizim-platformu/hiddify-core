@@ -1,11 +1,17 @@
 package config
 
 import (
+	"context"
+	stdjson "encoding/json"
+	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing-box/route/rule"
+	"github.com/sagernet/sing/common/json"
 )
 
 // Rule-sets are bundled with the app and read from HiddifyOptions.RuleSetDir.
@@ -72,10 +78,63 @@ func derbentRoutingRuleSet(hopt *HiddifyOptions) (option.RuleSet, bool) {
 	if err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
 		return option.RuleSet{}, false
 	}
+	if err := validateDerbentRoutingFile(hopt.DerbentRoutingRuleSet); err != nil {
+		log.Printf("derbent routing rule-set ignored (full VPN): %v", err)
+		return option.RuleSet{}, false
+	}
 	return option.RuleSet{
 		Type:         C.RuleSetTypeLocal,
 		Tag:          derbentRoutingTag,
 		Format:       C.RuleSetFormatSource,
 		LocalOptions: option.LocalRuleSet{Path: hopt.DerbentRoutingRuleSet},
 	}, true
+}
+
+// derbentRoutingKeys are the only rule keys the panel/app emit.
+var derbentRoutingKeys = map[string]bool{"domain": true, "domain_suffix": true, "ip_cidr": true}
+
+// validateDerbentRoutingFile parses the file the way sing-box will (a file it
+// rejects would stop the whole service from starting) and also enforces our
+// own contract: version 3, at least one rule, only domain/domain_suffix/ip_cidr.
+func validateDerbentRoutingFile(path string) error {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	compat, err := json.UnmarshalExtended[option.PlainRuleSetCompat](content)
+	if err != nil {
+		return err
+	}
+	plain, err := compat.Upgrade()
+	if err != nil {
+		return err
+	}
+	if compat.Version != C.RuleSetVersion3 {
+		return fmt.Errorf("rule-set version %d, want %d", compat.Version, C.RuleSetVersion3)
+	}
+	if len(plain.Rules) == 0 {
+		return fmt.Errorf("rule-set has no rules")
+	}
+	var raw struct {
+		Rules []map[string]stdjson.RawMessage `json:"rules"`
+	}
+	if err := stdjson.Unmarshal(content, &raw); err != nil {
+		return err
+	}
+	if len(raw.Rules) != len(plain.Rules) {
+		return fmt.Errorf("rule count mismatch")
+	}
+	for i, r := range raw.Rules {
+		for k := range r {
+			if !derbentRoutingKeys[k] {
+				return fmt.Errorf("rule %d: unsupported key %q", i, k)
+			}
+		}
+	}
+	for i, r := range plain.Rules {
+		if _, err := rule.NewHeadlessRule(context.Background(), r); err != nil {
+			return fmt.Errorf("rule %d: %w", i, err)
+		}
+	}
+	return nil
 }

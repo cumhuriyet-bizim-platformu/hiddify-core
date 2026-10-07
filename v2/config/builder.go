@@ -807,13 +807,15 @@ func setRoutingOptions(options *option.Options, hopt *HiddifyOptions) error {
 	// before the region rules (.tr and geoip-tr still go direct). Two fixed shapes,
 	// not the generic Rule loop. Without a valid file nothing is added (full VPN).
 	finalOutbound := OutboundMainDetour
+	whitelistDNS := false // whitelist: names not in the list resolve directly, outside the tunnel
 	if drs, ok := derbentRoutingRuleSet(hopt); ok {
 		rulesets = append(rulesets, drs)
-		routeOutbound, dnsServer := OutboundMainDetour, DNSRemoteTag
+		routeOutbound, dnsServer, dnsStrategy := OutboundMainDetour, DNSRemoteTag, hopt.RemoteDnsDomainStrategy
 		if hopt.DerbentRoutingMode == "whitelist" {
 			finalOutbound = OutboundDirectTag
+			whitelistDNS = true
 		} else {
-			routeOutbound, dnsServer = OutboundDirectTag, DNSMultiDirectTag
+			routeOutbound, dnsServer, dnsStrategy = OutboundDirectTag, DNSMultiDirectTag, hopt.DirectDnsDomainStrategy
 		}
 		routeRules = append(routeRules, option.Rule{
 			Type: C.RuleTypeDefault,
@@ -831,7 +833,7 @@ func setRoutingOptions(options *option.Options, hopt *HiddifyOptions) error {
 				Action: C.RuleActionTypeRoute,
 				RouteOptions: option.DNSRouteActionOptions{
 					Server:         dnsServer,
-					Strategy:       hopt.DirectDnsDomainStrategy,
+					Strategy:       dnsStrategy,
 					RewriteTTL:     &DEFAULT_DNS_TTL,
 					BypassIfFailed: false,
 				},
@@ -947,7 +949,9 @@ func setRoutingOptions(options *option.Options, hopt *HiddifyOptions) error {
 		// },
 	}
 	// if opt.EnableDNSRouting {
-	if hopt.EnableFakeDNS {
+	// Whitelist mode: no fake DNS, it would capture the unlisted names that must
+	// resolve to real addresses and go direct (listed names matched the rule above).
+	if hopt.EnableFakeDNS && !whitelistDNS {
 		// inbounds := []string{InboundTUNTag}
 		// for _, inp := range options.Inbounds {
 		// 	if strings.Contains(inp.Tag, InboundDirectTag) || strings.Contains(inp.Tag, InboundRedirect) || strings.Contains(inp.Tag, InboundTProxy) {
@@ -978,13 +982,17 @@ func setRoutingOptions(options *option.Options, hopt *HiddifyOptions) error {
 
 	}
 
+	catchAllDNS, catchAllStrategy := DNSMultiRemoteTag, hopt.RemoteDnsDomainStrategy
+	if whitelistDNS {
+		catchAllDNS, catchAllStrategy = DNSMultiDirectTag, hopt.DirectDnsDomainStrategy
+	}
 	dnsRules = append(dnsRules, option.DefaultDNSRule{
 		RawDefaultDNSRule: option.RawDefaultDNSRule{},
 		DNSRuleAction: option.DNSRuleAction{
 			Action: C.RuleActionTypeRoute,
 			RouteOptions: option.DNSRouteActionOptions{
-				Server:         DNSMultiRemoteTag,
-				Strategy:       hopt.RemoteDnsDomainStrategy,
+				Server:         catchAllDNS,
+				Strategy:       catchAllStrategy,
 				RewriteTTL:     &DEFAULT_DNS_TTL,
 				BypassIfFailed: false,
 			},
