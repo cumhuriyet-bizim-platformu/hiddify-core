@@ -41,6 +41,11 @@ type HiddifyOptions struct {
 	// invalid file, means today's routing.
 	DerbentRoutingMode    string `json:"derbent-routing-mode,omitempty"`
 	DerbentRoutingRuleSet string `json:"derbent-routing-rule-set,omitempty"`
+
+	// Derbent: the app's "Automatically check connection IP" setting. Only when
+	// set does outbound monitoring look up exit IPs from third-party IP-info
+	// services, and never in whitelist mode. Not overridable.
+	EnableIPInfo bool `json:"enable-ip-info,omitempty"`
 }
 
 type DNSOptions struct {

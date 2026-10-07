@@ -395,9 +395,23 @@ func setExperimental(options *option.Options, hopt *HiddifyOptions) {
 				Interval:       badoption.Duration(hopt.URLTestInterval.Duration()),
 				DebounceWindow: badoption.Duration(time.Millisecond * 500),
 				IdleTimeout:    badoption.Duration(hopt.URLTestInterval.Duration().Nanoseconds() * 3),
+				IPInfo:         ipInfoAllowed(hopt),
 			},
 		}
 	}
+}
+
+// ipInfoAllowed reports whether outbound monitoring may look up exit IPs from
+// third-party IP-info services. Derbent: only when the app's setting is on, and
+// never in whitelist mode, where the server refuses those hosts anyway.
+func ipInfoAllowed(hopt *HiddifyOptions) bool {
+	if !hopt.EnableIPInfo {
+		return false
+	}
+	if _, ok := derbentRoutingRuleSet(hopt); ok && hopt.DerbentRoutingMode == "whitelist" {
+		return false
+	}
+	return true
 }
 
 func setLog(options *option.Options, opt *HiddifyOptions) {
