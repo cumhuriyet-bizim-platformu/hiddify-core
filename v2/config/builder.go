@@ -9,7 +9,6 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
-	sync "sync"
 	"time"
 
 	"github.com/hiddify/hiddify-core/v2/hutils"
@@ -247,10 +246,8 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
 		endpoints = append(endpoints, *out)
 	}
 	if len(opt.ConnectionTestUrls) == 0 {
-		opt.ConnectionTestUrls = []string{opt.ConnectionTestUrl, "https://www.google.com/generate_204", "http://captive.apple.com/generate_204", "https://cp.cloudflare.com"}
-		if isBlockedConnectionTestUrl(opt.ConnectionTestUrl) {
-			opt.ConnectionTestUrls = []string{opt.ConnectionTestUrl}
-		}
+		// Derbent: the panel pushes the server's own generate_204; one neutral fallback. No Google/Apple.
+		opt.ConnectionTestUrls = dedupeNonEmpty([]string{opt.ConnectionTestUrl, "https://cp.cloudflare.com"})
 	}
 	// urlTest := option.Outbound{
 	// 	Type: C.TypeURLTest,
@@ -361,14 +358,6 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
 	return nil
 }
 
-func isBlockedConnectionTestUrl(d string) bool {
-	u, err := url.Parse(d)
-	if err != nil {
-		return false
-	}
-	return isBlockedDomain(u.Host)
-}
-
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
@@ -380,10 +369,7 @@ func contains(slice []string, item string) bool {
 
 func setExperimental(options *option.Options, hopt *HiddifyOptions) {
 	if len(hopt.ConnectionTestUrls) == 0 {
-		hopt.ConnectionTestUrls = []string{hopt.ConnectionTestUrl, "http://captive.apple.com/generate_204", "https://cp.cloudflare.com", "https://google.com/generate_204"}
-		if isBlockedConnectionTestUrl(hopt.ConnectionTestUrl) {
-			hopt.ConnectionTestUrls = []string{hopt.ConnectionTestUrl}
-		}
+		hopt.ConnectionTestUrls = dedupeNonEmpty([]string{hopt.ConnectionTestUrl, "https://cp.cloudflare.com"})
 	}
 	if hopt.EnableClashApi {
 		if hopt.ClashApiSecret == "" {
@@ -1048,53 +1034,6 @@ func patchHiddifyWarpFromConfig(out *option.Outbound, opt HiddifyOptions) *optio
 	return out
 }
 
-var (
-	ipMaps      = map[string][]string{}
-	ipMapsMutex sync.Mutex
-)
-
-func getIPs(domains ...string) []string {
-	var wg sync.WaitGroup
-	resChan := make(chan string, len(domains)*10) // Collect both IPv4 and IPv6
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-
-	for _, d := range domains {
-		wg.Add(1)
-		go func(domain string) {
-			defer wg.Done()
-			ips, err := net.DefaultResolver.LookupIP(ctx, "ip", domain)
-			if err != nil {
-				return
-			}
-			for _, ip := range ips {
-				ipStr := ip.String()
-				if !isBlockedIP(ipStr) {
-					resChan <- ipStr
-				}
-			}
-		}(d)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resChan)
-	}()
-
-	var res []string
-	for ip := range resChan {
-		res = append(res, ip)
-	}
-	if len(res) == 0 && ipMaps[domains[0]] != nil {
-		return ipMaps[domains[0]]
-	}
-	ipMapsMutex.Lock()
-	ipMaps[domains[0]] = res
-	ipMapsMutex.Unlock()
-
-	return res
-}
-
 func isBlockedDomain(domain string) bool {
 	if strings.HasPrefix("full:", domain) {
 		return false
@@ -1102,27 +1041,21 @@ func isBlockedDomain(domain string) bool {
 	if strings.Contains(domain, "instagram") || strings.Contains(domain, "facebook") || strings.Contains(domain, "telegram") || strings.Contains(domain, "t.me") {
 		return true
 	}
-	ips := getIPs(domain)
-	if len(ips) == 0 {
-		// fmt.Println(err)
-		return true
-	}
-
-	// // Print the IP addresses associated with the domain
-	// fmt.Printf("IP addresses for %s:\n", domain)
-	// for _, ip := range ips {
-	// 	if isBlockedIP(ip) {
-	// 		return true
-	// 	}
-	// }
+	// Derbent: no DNS lookup while building (it would go through the ISP resolver).
 	return false
 }
 
-func isBlockedIP(ip string) bool {
-	if strings.HasPrefix(ip, "10.") || strings.HasPrefix(ip, "2001:4188:2:600:10") {
-		return true
+func dedupeNonEmpty(in []string) []string {
+	out := make([]string, 0, len(in))
+	seen := map[string]bool{}
+	for _, v := range in {
+		if v == "" || seen[v] {
+			continue
+		}
+		seen[v] = true
+		out = append(out, v)
 	}
-	return false
+	return out
 }
 
 func removeDuplicateStr(strSlice []string) []string {
