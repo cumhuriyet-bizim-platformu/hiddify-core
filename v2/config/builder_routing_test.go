@@ -207,6 +207,13 @@ func TestRoutingBadFileIsFullVPN(t *testing.T) {
 		"process_name":    `{"version":3,"rules":[{"process_name":["x"]}]}`,
 		"mixed bad key":   `{"version":3,"rules":[{"domain":["a.com"]},{"process_name":["x"]}]}`,
 		"bad cidr":        `{"version":3,"rules":[{"ip_cidr":["not-a-cidr"]}]}`,
+		"empty rule":      `{"version":3,"rules":[{}]}`,
+		"empty list rule": `{"version":3,"rules":[{"domain":[]}]}`,
+		"empty among ok":  `{"version":3,"rules":[{"domain":["a.com"]},{}]}`,
+		"v4 /0":           `{"version":3,"rules":[{"ip_cidr":["0.0.0.0/0"]}]}`,
+		"v4 /7":           `{"version":3,"rules":[{"ip_cidr":["10.0.0.0/7"]}]}`,
+		"v6 /0":           `{"version":3,"rules":[{"ip_cidr":["::/0"]}]}`,
+		"v6 /15":          `{"version":3,"rules":[{"ip_cidr":["2000::/15"]}]}`,
 	}
 	for name, content := range bad {
 		for _, mode := range []string{"whitelist", "full"} {

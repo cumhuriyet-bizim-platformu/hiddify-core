@@ -5,6 +5,7 @@ import (
 	stdjson "encoding/json"
 	"fmt"
 	"log"
+	"net/netip"
 	"os"
 	"path/filepath"
 
@@ -132,6 +133,26 @@ func validateDerbentRoutingFile(path string) error {
 		}
 	}
 	for i, r := range plain.Rules {
+		d := r.DefaultOptions
+		if r.Type != "" && r.Type != C.RuleTypeDefault {
+			return fmt.Errorf("rule %d: unsupported rule type %q", i, r.Type)
+		}
+		// An empty rule matches everything in sing-box.
+		if len(d.Domain)+len(d.DomainSuffix)+len(d.IPCIDR) == 0 {
+			return fmt.Errorf("rule %d: no entries", i)
+		}
+		for _, c := range d.IPCIDR {
+			pfx, err := netip.ParsePrefix(c)
+			if err != nil {
+				if _, aerr := netip.ParseAddr(c); aerr != nil {
+					return fmt.Errorf("rule %d: bad cidr %q", i, c)
+				}
+				continue
+			}
+			if (pfx.Addr().Is4() && pfx.Bits() < 8) || (!pfx.Addr().Is4() && pfx.Bits() < 16) {
+				return fmt.Errorf("rule %d: prefix %q too short", i, c)
+			}
+		}
 		if _, err := rule.NewHeadlessRule(context.Background(), r); err != nil {
 			return fmt.Errorf("rule %d: %w", i, err)
 		}
