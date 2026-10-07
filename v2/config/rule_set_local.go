@@ -53,3 +53,29 @@ func localRuleSet(hopt *HiddifyOptions, tag string, relPath string) (option.Rule
 		},
 	}, true
 }
+
+// derbentRoutingTag is the tag of the app-provided routing rule-set.
+const derbentRoutingTag = "derbent-routing"
+
+// derbentRoutingRuleSet returns the local source-format rule-set the app wrote
+// for whitelist / bypass routing. Derbent: it returns false (so the caller uses
+// today's full-VPN routing) unless the mode is "whitelist" or "full" and the
+// file exists as a non-empty regular file.
+func derbentRoutingRuleSet(hopt *HiddifyOptions) (option.RuleSet, bool) {
+	if hopt.DerbentRoutingMode != "whitelist" && hopt.DerbentRoutingMode != "full" {
+		return option.RuleSet{}, false
+	}
+	if hopt.DerbentRoutingRuleSet == "" {
+		return option.RuleSet{}, false
+	}
+	info, err := os.Stat(hopt.DerbentRoutingRuleSet)
+	if err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
+		return option.RuleSet{}, false
+	}
+	return option.RuleSet{
+		Type:         C.RuleSetTypeLocal,
+		Tag:          derbentRoutingTag,
+		Format:       C.RuleSetFormatSource,
+		LocalOptions: option.LocalRuleSet{Path: hopt.DerbentRoutingRuleSet},
+	}, true
+}

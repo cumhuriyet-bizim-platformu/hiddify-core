@@ -11,14 +11,18 @@ import (
 )
 
 type HiddifyOptions struct {
-	EnableFullConfig        bool   `json:"enable-full-config,omitempty" overridable:"true"`
-	LogLevel                string `json:"log-level,omitempty"`
-	LogFile                 string `json:"log-file,omitempty"`
-	EnableClashApi          bool   `json:"enable-clash-api,omitempty"`
-	ClashApiPort            uint16 `json:"clash-api-port,omitempty"`
-	ClashApiSecret          string `json:"web-secret,omitempty"`
-	Region                  string `json:"region,omitempty"`
-	RuleSetDir              string `json:"rule-set-dir,omitempty"` // bundled .srs files, set by the app; not overridable
+	EnableFullConfig bool   `json:"enable-full-config,omitempty" overridable:"true"`
+	LogLevel         string `json:"log-level,omitempty"`
+	LogFile          string `json:"log-file,omitempty"`
+	EnableClashApi   bool   `json:"enable-clash-api,omitempty"`
+	ClashApiPort     uint16 `json:"clash-api-port,omitempty"`
+	ClashApiSecret   string `json:"web-secret,omitempty"`
+	Region           string `json:"region,omitempty"`
+	RuleSetDir       string `json:"rule-set-dir,omitempty"` // bundled .srs files, set by the app; not overridable
+	// Derbent: "whitelist" or "full" (bypass) routing from a local source rule-set
+	// file the app validated; not overridable. Anything else, or a missing file, means today's routing.
+	DerbentRoutingMode      string `json:"derbent-routing-mode,omitempty"`
+	DerbentRoutingRuleSet   string `json:"derbent-routing-rule-set,omitempty"`
 	BlockAds                bool   `json:"block-ads,omitempty" overridable:"true"`
 	UseXrayCoreWhenPossible bool   `json:"use-xray-core-when-possible,omitempty" overridable:"true"`
 	BalancerStrategy        string `json:"balancer-strategy,omitempty" overridable:"true"`

@@ -803,6 +803,41 @@ func setRoutingOptions(options *option.Options, hopt *HiddifyOptions) error {
 			})
 		}
 	}
+	// Derbent: whitelist / bypass shapes. After force-direct, LAN and block rules,
+	// before the region rules (.tr and geoip-tr still go direct). Two fixed shapes,
+	// not the generic Rule loop. Without a valid file nothing is added (full VPN).
+	finalOutbound := OutboundMainDetour
+	if drs, ok := derbentRoutingRuleSet(hopt); ok {
+		rulesets = append(rulesets, drs)
+		routeOutbound, dnsServer := OutboundMainDetour, DNSRemoteTag
+		if hopt.DerbentRoutingMode == "whitelist" {
+			finalOutbound = OutboundDirectTag
+		} else {
+			routeOutbound, dnsServer = OutboundDirectTag, DNSMultiDirectTag
+		}
+		routeRules = append(routeRules, option.Rule{
+			Type: C.RuleTypeDefault,
+			DefaultOptions: option.DefaultRule{
+				RawDefaultRule: option.RawDefaultRule{RuleSet: []string{derbentRoutingTag}},
+				RuleAction: option.RuleAction{
+					Action:       C.RuleActionTypeRoute,
+					RouteOptions: option.RouteActionOptions{Outbound: routeOutbound},
+				},
+			},
+		})
+		dnsRules = append(dnsRules, option.DefaultDNSRule{
+			RawDefaultDNSRule: option.RawDefaultDNSRule{RuleSet: []string{derbentRoutingTag}},
+			DNSRuleAction: option.DNSRuleAction{
+				Action: C.RuleActionTypeRoute,
+				RouteOptions: option.DNSRouteActionOptions{
+					Server:         dnsServer,
+					Strategy:       hopt.DirectDnsDomainStrategy,
+					RewriteTTL:     &DEFAULT_DNS_TTL,
+					BypassIfFailed: false,
+				},
+			},
+		})
+	}
 	if hopt.Region != "other" {
 		dnsRules = append(dnsRules, option.DefaultDNSRule{
 			RawDefaultDNSRule: option.RawDefaultDNSRule{
@@ -895,7 +930,7 @@ func setRoutingOptions(options *option.Options, hopt *HiddifyOptions) error {
 	}
 	options.Route = &option.RouteOptions{
 		Rules:               routeRules,
-		Final:               OutboundMainDetour,
+		Final:               finalOutbound,
 		AutoDetectInterface: (!C.IsAndroid && !C.IsIos) && (hopt.EnableTun || hopt.EnableTunService),
 		DefaultDomainResolver: &option.DomainResolveOptions{
 			Server:   DNSMultiDirectTag,
